@@ -49,7 +49,6 @@ class DB {
     }
 
     int addInventory(std::string name, int stats, int qty, std::string grade) {
-        // TODO: pass the arguments by string
         std::ostringstream oss;
         oss << "INSERT INTO INVENTORY(NAME, STATS, QTY, GRADE) "
                "VALUES('"
@@ -59,10 +58,28 @@ class DB {
 
         exit = sqlite3_exec(this->db, sql.c_str(), callback, NULL, &errormsg);
         if (exit != SQLITE_OK) {
-            std::cerr << "Error in selectInventory function." << std::endl;
+            std::cerr << "Error in addInventory function." << std::endl;
             sqlite3_free(errormsg);
         } else
             std::cout << "Inserted Successfully" << std::endl;
+
+        return exit;
+    }
+
+    int deleteItemFromInventory(std::string name) {
+        // Let's treat the db as stack and delete the last ID added with name.
+        std::ostringstream oss;
+        oss << "DELETE FROM INVENTORY WHERE ID = (SELECT MAX(ID) FROM "
+               "INVENTORY WHERE NAME = '"
+            << name << "');";
+        std::string sql = oss.str();
+
+        exit = sqlite3_exec(this->db, sql.c_str(), callback, NULL, &errormsg);
+        if (exit != SQLITE_OK)
+            std::cerr << "Error deleting the item " << name << std::endl;
+        else
+            std::cout << "Item named: " << name << " deleted Successfully"
+                      << std::endl;
 
         return exit;
     }
@@ -84,7 +101,8 @@ int main() {
     std::string gradeTier = "F";
 
     inventory.createTable();
-    inventory.addInventory(rustySword, swordStats, qty, gradeTier);
+    // inventory.addInventory(rustySword, swordStats, qty, gradeTier);
+    inventory.deleteItemFromInventory(rustySword);
     inventory.selectInventory();
 
     return 0;
