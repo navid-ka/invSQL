@@ -1,5 +1,7 @@
 #include <iostream>
 #include <sqlite3.h>
+#include <sstream>
+#include <string>
 
 class DB {
   public:
@@ -46,10 +48,14 @@ class DB {
         return exit;
     }
 
-    int addInventory() {
+    int addInventory(std::string name, int stats, int qty, std::string grade) {
         // TODO: pass the arguments by string
-        std::string sql = "INSERT INTO INVENTORY(NAME, STATS, QTY, GRADE) "
-                          "VALUES('Rusty Sword', '4', '1', 'F');";
+        std::ostringstream oss;
+        oss << "INSERT INTO INVENTORY(NAME, STATS, QTY, GRADE) "
+               "VALUES('"
+            << name << "', '" << stats << "', '" << qty << "', '" << grade
+            << "');";
+        std::string sql = oss.str();
 
         exit = sqlite3_exec(this->db, sql.c_str(), callback, NULL, &errormsg);
         if (exit != SQLITE_OK) {
@@ -70,9 +76,16 @@ class DB {
 
 int main() {
     DB inventory;
+
+    // Inventory item
+    std::string rustySword = "Rusty Sword";
+    int swordStats = 4;
+    int qty = 1;
+    std::string gradeTier = "F";
+
     inventory.createTable();
+    inventory.addInventory(rustySword, swordStats, qty, gradeTier);
     inventory.selectInventory();
-    inventory.addInventory();
 
     return 0;
 }
