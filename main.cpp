@@ -5,10 +5,14 @@
 
 class DB {
   public:
-    DB() { exit = sqlite3_open(file, &db); }
-    ~DB() { sqlite3_close(this->db); }
+    DB() {
+        sqlite3_open(fileInv, &inventory);
+        sqlite3_open(fileEquip, &equipment);
+        createInventory();
+    }
+    ~DB() { sqlite3_close(inventory); }
 
-    int createTable() {
+    int createInventory() {
         std::string sql = "CREATE TABLE IF NOT EXISTS INVENTORY("
                           "ID INTEGER PRIMARY KEY AUTOINCREMENT, "
                           "NAME      TEXT NOT NULL, "
@@ -17,7 +21,7 @@ class DB {
                           "GRADE     CHAR(1) );";
 
         try {
-            exit = sqlite3_exec(this->db, sql.c_str(), NULL, 0, &errormsg);
+            exit = sqlite3_exec(inventory, sql.c_str(), NULL, 0, &errormsg);
             if (exit != SQLITE_OK) {
                 std::cerr << "Error in createTable function." << std::endl;
                 sqlite3_free(errormsg);
@@ -36,10 +40,11 @@ class DB {
         std::cout << std::endl;
         return 0;
     }
+
     int selectInventory() {
         std::string sql = "SELECT * FROM INVENTORY;";
 
-        exit = sqlite3_exec(this->db, sql.c_str(), callback, NULL, &errormsg);
+        exit = sqlite3_exec(inventory, sql.c_str(), callback, NULL, &errormsg);
         if (exit != SQLITE_OK) {
             std::cerr << "Error in selectInventory function." << std::endl;
             sqlite3_free(errormsg);
@@ -48,21 +53,61 @@ class DB {
         return exit;
     }
 
-    int addInventory(std::string name, int stats, int qty, std::string grade) {
+    static int existsCallback(void *count, int argc, char **argv,
+                              char **azColName) {
+        int *flag = (int *)count;
+        *flag = 1;
+        return 1;
+    }
+
+    bool itemExists(std::string name) {
+        int callback_count = 0;
         std::ostringstream oss;
-        oss << "INSERT INTO INVENTORY(NAME, STATS, QTY, GRADE) "
-               "VALUES('"
-            << name << "', '" << stats << "', '" << qty << "', '" << grade
-            << "');";
+        oss << "SELECT * FROM INVENTORY WHERE NAME ='" << name << "';";
         std::string sql = oss.str();
+        exit = sqlite3_exec(inventory, sql.c_str(), existsCallback,
+                            &callback_count, &errormsg);
+        if (callback_count > 0)
+            return true;
+        else
+            return false;
+    }
 
-        exit = sqlite3_exec(this->db, sql.c_str(), callback, NULL, &errormsg);
+    int updateQTYinv(std::string name, int qty) {
+
+        std::ostringstream oss;
+        oss << "UPDATE INVENTORY SET QTY = QTY + " << qty << " WHERE NAME ='"
+            << name << "' AND QTY < 100;";
+        std::string sql = oss.str();
+        exit = sqlite3_exec(inventory, sql.c_str(), NULL, NULL, &errormsg);
         if (exit != SQLITE_OK) {
-            std::cerr << "Error in addInventory function." << std::endl;
-            sqlite3_free(errormsg);
-        } else
-            std::cout << "Inserted Successfully" << std::endl;
+            std::cerr << "Failed to update or reached max capacity"
+                      << std::endl;
+            return 1;
+        } else {
+            return 0;
+        }
+    }
 
+    int addInventory(std::string name, int stats, int qty, std::string grade) {
+
+        if (itemExists(name)) {
+            updateQTYinv(name, qty);
+        } else {
+            std::ostringstream oss;
+            oss << "INSERT INTO INVENTORY(NAME, STATS, QTY, GRADE) "
+                   "VALUES('"
+                << name << "', '" << stats << "', '" << qty << "', '" << grade
+                << "');";
+            std::string sql = oss.str();
+
+            exit = sqlite3_exec(inventory, sql.c_str(), NULL, NULL, &errormsg);
+            if (exit != SQLITE_OK) {
+                std::cerr << "Error in addInventory function." << std::endl;
+                sqlite3_free(errormsg);
+            } else
+                std::cout << "Inserted Successfully" << std::endl;
+        }
         return exit;
     }
 
@@ -74,7 +119,7 @@ class DB {
             << name << "');";
         std::string sql = oss.str();
 
-        exit = sqlite3_exec(this->db, sql.c_str(), callback, NULL, &errormsg);
+        exit = sqlite3_exec(inventory, sql.c_str(), callback, NULL, &errormsg);
         if (exit != SQLITE_OK)
             std::cerr << "Error deleting the item " << name << std::endl;
         else
@@ -83,10 +128,20 @@ class DB {
 
         return exit;
     }
+    // TODO::
+    // int updateQTYInv(); <- or 2 functions to increase decrease object in
+    // inventory and refactor addInventory to not create the same entry just
+    // updateQTYInv
+    // int createEquipment();
+    // int deleteEquipment(); <- this will
+    // bring object back to inventory
+    // int selectEquipment(); equipment will have 8 slots
 
   private:
-    sqlite3 *db;
-    const char *file = "inventory.db";
+    sqlite3 *inventory;
+    sqlite3 *equipment;
+    const char *fileInv = "inventory.db";
+    const char *fileEquip = "equipment.db";
     char *errormsg;
     int exit;
 };
@@ -100,9 +155,8 @@ int main() {
     int qty = 1;
     std::string gradeTier = "F";
 
-    inventory.createTable();
-    // inventory.addInventory(rustySword, swordStats, qty, gradeTier);
-    inventory.deleteItemFromInventory(rustySword);
+    inventory.addInventory(rustySword, swordStats, qty, gradeTier);
+    // inventory.deleteItemFromInventory(rustySword);
     inventory.selectInventory();
 
     return 0;
