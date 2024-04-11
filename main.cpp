@@ -5,6 +5,13 @@
 
 class DB {
   public:
+    struct Item {
+        std::string name;
+        int stats;
+        int qty;
+        std::string tier;
+    };
+
     DB() {
         sqlite3_open(fileInv, &inventory);
         activateForeignKeys();
@@ -109,16 +116,16 @@ class DB {
         }
     }
 
-    int addInventory(std::string name, int stats, int qty, std::string grade) {
+    int addInventory(Item item) {
 
-        if (itemExists(name)) {
-            updateQTYinv(name, qty);
+        if (itemExists(item.name)) {
+            updateQTYinv(item.name, item.qty);
         } else {
             std::ostringstream oss;
             oss << "INSERT INTO INVENTORY(NAME, STATS, QTY, GRADE) "
                    "VALUES('"
-                << name << "', '" << stats << "', '" << qty << "', '" << grade
-                << "');";
+                << item.name << "', '" << item.stats << "', '" << item.qty
+                << "', '" << item.tier << "');";
             std::string sql = oss.str();
 
             exit = sqlite3_exec(inventory, sql.c_str(), NULL, NULL, &errormsg);
@@ -149,8 +156,9 @@ class DB {
         return exit;
     }
     // TODO::
+    // Restructuring the tables
     // int deleteEquipment(); <- this will bring object back to inventory
-    // int selectEquipment(); equipment will have 8 slots
+    // int equipFromInventory();
 
     int createEquipment() {
         std::string sql =
@@ -181,12 +189,9 @@ int main() {
     DB db;
 
     // Inventory item
-    std::string rustySword = "Rusty Sword";
-    int swordStats = 4;
-    int qty = 1;
-    std::string gradeTier = "F";
+    DB::Item rustySword = {"Rusty Sword", 4, 1, "F"};
 
-    db.addInventory(rustySword, swordStats, qty, gradeTier);
+    db.addInventory(rustySword);
     // inventory.deleteItemFromInventory(rustySword);
     db.selectFROM("INVENTORY", db.getDB());
     db.selectFROM("EQUIPMENT", db.getDB());
