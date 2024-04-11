@@ -129,13 +129,32 @@ class DB {
         return exit;
     }
     // TODO::
-    // int updateQTYInv(); <- or 2 functions to increase decrease object in
-    // inventory and refactor addInventory to not create the same entry just
-    // updateQTYInv
-    // int createEquipment();
-    // int deleteEquipment(); <- this will
-    // bring object back to inventory
+    // int deleteEquipment(); <- this will bring object back to inventory
     // int selectEquipment(); equipment will have 8 slots
+
+    int createEquipment() {
+        std::string attach_sql = "ATTACH DATABASE ./inventory.db AS inv;";
+        exit =
+            sqlite3_exec(equipment, attach_sql.c_str(), NULL, NULL, &errormsg);
+        if (exit != SQLITE_OK) {
+            std::cerr << "ATTACH FAILED: " << errormsg << std::endl;
+            sqlite3_free(errormsg);
+            return 1;
+        }
+        std::string sql =
+            "CREATE TABLE EQUIPMENT ("
+            "SLOTID INTEGER PRIMARY KEY,"
+            "ITEMNAME TEXT,"
+            "FOREIGN KEY (ITEMNAME) REFERENCES inv.INVENTORY(NAME));";
+        exit = sqlite3_exec(equipment, sql.c_str(), NULL, NULL, &errormsg);
+        if (exit != SQLITE_OK) {
+            std::cerr << "Error in createEquipment function." << std::endl;
+            sqlite3_free(errormsg);
+        } else
+            std::cout << "Table created Successfully" << std::endl;
+
+        return 0;
+    }
 
   private:
     sqlite3 *inventory;
