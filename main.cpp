@@ -10,7 +10,10 @@ class DB {
         sqlite3_open(fileEquip, &equipment);
         createInventory();
     }
-    ~DB() { sqlite3_close(inventory); }
+    ~DB() {
+        sqlite3_close(equipment);
+        sqlite3_close(inventory);
+    }
 
     int createInventory() {
         std::string sql = "CREATE TABLE IF NOT EXISTS INVENTORY("
