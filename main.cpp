@@ -5,9 +5,20 @@
 
 class DB {
   public:
+    enum class EquipmentType {
+        WEAPON = 1,
+        ARMOR = 2,
+        HELMET = 3,
+        RING1 = 4,
+        RING2 = 5,
+        RING3 = 6,
+        RING4 = 7
+    };
+
     struct Item {
         std::string name;
         int stats;
+        EquipmentType type;
         int qty;
         std::string tier;
     };
@@ -33,13 +44,13 @@ class DB {
     }
 
     int createInventory() {
-        std::string sql = "CREATE TABLE IF NOT EXISTS INVENTORY("
+        std::string sql = "CREATE TABLE IF NOT EXISTS INVENTORY ("
                           "ID INTEGER PRIMARY KEY AUTOINCREMENT, "
-                          "NAME      TEXT NOT NULL, "
-                          "STATS     INT NOT NULL, "
-                          "QTY       INT  NOT NULL, "
-                          "GRADE     CHAR(1) );";
-
+                          "NAME TEXT NOT NULL, "
+                          "STATS INT NOT NULL, "
+                          "TYPE INT NOT NULL, "
+                          "QTY INT NOT NULL, "
+                          "GRADE CHAR(1) );";
         try {
             exit = sqlite3_exec(inventory, sql.c_str(), NULL, 0, &errormsg);
             if (exit != SQLITE_OK) {
@@ -100,11 +111,11 @@ class DB {
             return false;
     }
 
-    int updateQTYinv(std::string name, int qty) {
+    int increaseQtyInv(std::string name, int qty) {
 
         std::ostringstream oss;
         oss << "UPDATE INVENTORY SET QTY = QTY + " << qty << " WHERE NAME ='"
-            << name << "' AND QTY < 100;";
+            << name << "' AND QTY < 99;";
         std::string sql = oss.str();
         exit = sqlite3_exec(inventory, sql.c_str(), NULL, NULL, &errormsg);
         if (exit != SQLITE_OK) {
@@ -116,18 +127,33 @@ class DB {
         }
     }
 
+    int decreaseQtyInv(std::string name) {
+        std::ostringstream updateSql;
+        updateSql << "UPDATE INVENTORY SET QTY = QTY - 1 WHERE NAME = '" << name
+                  << "';";
+        std::string updateSqlStr = updateSql.str();
+        exit = sqlite3_exec(inventory, updateSqlStr.c_str(), NULL, NULL,
+                            &errormsg);
+        if (exit != SQLITE_OK) {
+            std::cerr << "Error updating inventory quantity for item '" << name
+                      << "': " << errormsg << std::endl;
+            sqlite3_free(errormsg);
+            return exit;
+        }
+        return exit;
+    }
+
     int addInventory(Item item) {
 
         if (itemExists(item.name)) {
-            updateQTYinv(item.name, item.qty);
+            increaseQtyInv(item.name, item.qty);
         } else {
             std::ostringstream oss;
-            oss << "INSERT INTO INVENTORY(NAME, STATS, QTY, GRADE) "
-                   "VALUES('"
-                << item.name << "', '" << item.stats << "', '" << item.qty
-                << "', '" << item.tier << "');";
+            oss << "INSERT INTO INVENTORY(NAME, STATS, TYPE, QTY, GRADE) "
+                << "VALUES ('" << item.name << "', " << item.stats << ", "
+                << static_cast<int>(item.type) << ", " << item.qty << ", '"
+                << item.tier << "');";
             std::string sql = oss.str();
-
             exit = sqlite3_exec(inventory, sql.c_str(), NULL, NULL, &errormsg);
             if (exit != SQLITE_OK) {
                 std::cerr << "Error in addInventory function." << std::endl;
@@ -161,11 +187,12 @@ class DB {
     // int equipFromInventory();
 
     int createEquipment() {
-        std::string sql =
-            "CREATE TABLE IF NOT EXISTS EQUIPMENT ("
-            "ID         INTEGER PRIMARY KEY, "
-            "ITEMNAME   TEXT NOT NULL, "
-            "FOREIGN KEY (ITEMNAME) REFERENCES INVENTORY(NAME) );";
+        std::string sql = "CREATE TABLE IF NOT EXISTS EQUIPMENT ("
+                          "ID INTEGER PRIMARY KEY, "
+                          "SLOT INTEGER NOT NULL, "
+                          "NAME TEXT NOT NULL, "
+                          "FOREIGN KEY (ID) REFERENCES INVENTORY(ID) );";
+
         exit = sqlite3_exec(inventory, sql.c_str(), NULL, NULL, &errormsg);
         if (exit != SQLITE_OK) {
             std::cerr << "Error in createEquipment function." << std::endl;
@@ -173,6 +200,32 @@ class DB {
         } else
             std::cout << "Table equipment created Successfully" << std::endl;
 
+        return 0;
+    }
+
+    int equipItem(Item item) {
+        std::ostringstream oss;
+        oss << "INSERT INTO EQUIPMENT (SLOT, NAME) VALUES ('"
+            << static_cast<int>(item.type) << "', '" << item.name << "');";
+        std::string insertSql = oss.str();
+        exit =
+            sqlite3_exec(inventory, insertSql.c_str(), NULL, NULL, &errormsg);
+        if (exit != SQLITE_OK) {
+            std::cerr << "Error inserting item into equipment: " << errormsg
+                      << std::endl;
+            sqlite3_free(errormsg);
+            return exit;
+        }
+        decreaseQtyInv(item.name);
+        std::cout << "Item '" << item.name
+                  << "' equipped successfully with ID: "
+                  << static_cast<int>(item.type) << std::endl;
+        return exit;
+    }
+
+    int unequipItem(std::string name) {
+        // TODO: TO IMPL
+        (void)name;
         return 0;
     }
 
@@ -189,10 +242,11 @@ int main() {
     DB db;
 
     // Inventory item
-    DB::Item rustySword = {"Rusty Sword", 4, 1, "F"};
-
+    DB::Item rustySword = {"Rusty Sword", 4, (DB::EquipmentType::WEAPON), 1,
+                           "F"};
     db.addInventory(rustySword);
-    // inventory.deleteItemFromInventory(rustySword);
+    db.equipItem(rustySword);
+    //  inventory.deleteItemFromInventory(rustySword);
     db.selectFROM("INVENTORY", db.getDB());
     db.selectFROM("EQUIPMENT", db.getDB());
 
