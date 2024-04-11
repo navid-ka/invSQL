@@ -7,12 +7,22 @@ class DB {
   public:
     DB() {
         sqlite3_open(fileInv, &inventory);
-        sqlite3_open(fileEquip, &equipment);
+        activateForeignKeys();
         createInventory();
+        createEquipment();
     }
-    ~DB() {
-        sqlite3_close(equipment);
-        sqlite3_close(inventory);
+    ~DB() { sqlite3_close(inventory); }
+
+    int activateForeignKeys() {
+        exit = sqlite3_exec(inventory, "PRAGMA foreign_keys = ON;", NULL, NULL,
+                            &errormsg);
+        if (exit != SQLITE_OK) {
+            std::cerr << "Error activating foreing_keys on inventory: "
+                      << errormsg << std::endl;
+            sqlite3_free(errormsg);
+            return 1;
+        }
+        return 0;
     }
 
     int createInventory() {
@@ -29,12 +39,14 @@ class DB {
                 std::cerr << "Error in createTable function." << std::endl;
                 sqlite3_free(errormsg);
             } else
-                std::cout << "Table created Successfully" << std::endl;
+                std::cout << "Table Inventory created Successfully"
+                          << std::endl;
         } catch (std::exception &e) {
             std::cerr << e.what();
         }
         return exit;
     }
+
     static int callback(void *NotUsed, int argc, char **argv,
                         char **azColName) {
         for (int i = 0; i < argc; i++) {
@@ -44,15 +56,20 @@ class DB {
         return 0;
     }
 
-    int selectInventory() {
-        std::string sql = "SELECT * FROM INVENTORY;";
+    int selectFROM(std::string table, sqlite3 *db) {
+        if (!db) {
+            std::cerr << "Invalid database pointer." << std::endl;
+        }
 
-        exit = sqlite3_exec(inventory, sql.c_str(), callback, NULL, &errormsg);
+        std::ostringstream oss;
+        oss << "SELECT * FROM " << table << ";";
+        std::string sql = oss.str();
+        exit = sqlite3_exec(db, sql.c_str(), callback, NULL, &errormsg);
         if (exit != SQLITE_OK) {
-            std::cerr << "Error in selectInventory function." << std::endl;
+            std::cerr << "Error in select function." << std::endl;
             sqlite3_free(errormsg);
         } else
-            std::cout << "Selected Successfully" << std::endl;
+            std::cout << "Selected Successfully FROM " << table << std::endl;
         return exit;
     }
 
@@ -136,40 +153,32 @@ class DB {
     // int selectEquipment(); equipment will have 8 slots
 
     int createEquipment() {
-        std::string attach_sql = "ATTACH DATABASE ./inventory.db AS inv;";
-        exit =
-            sqlite3_exec(equipment, attach_sql.c_str(), NULL, NULL, &errormsg);
-        if (exit != SQLITE_OK) {
-            std::cerr << "ATTACH FAILED: " << errormsg << std::endl;
-            sqlite3_free(errormsg);
-            return 1;
-        }
         std::string sql =
-            "CREATE TABLE EQUIPMENT ("
-            "SLOTID INTEGER PRIMARY KEY,"
-            "ITEMNAME TEXT,"
-            "FOREIGN KEY (ITEMNAME) REFERENCES inv.INVENTORY(NAME));";
-        exit = sqlite3_exec(equipment, sql.c_str(), NULL, NULL, &errormsg);
+            "CREATE TABLE IF NOT EXISTS EQUIPMENT ("
+            "ID         INTEGER PRIMARY KEY, "
+            "ITEMNAME   TEXT NOT NULL, "
+            "FOREIGN KEY (ITEMNAME) REFERENCES INVENTORY(NAME) );";
+        exit = sqlite3_exec(inventory, sql.c_str(), NULL, NULL, &errormsg);
         if (exit != SQLITE_OK) {
             std::cerr << "Error in createEquipment function." << std::endl;
             sqlite3_free(errormsg);
         } else
-            std::cout << "Table created Successfully" << std::endl;
+            std::cout << "Table equipment created Successfully" << std::endl;
 
         return 0;
     }
 
+    sqlite3 *getDB() { return inventory; }
+
   private:
     sqlite3 *inventory;
-    sqlite3 *equipment;
     const char *fileInv = "inventory.db";
-    const char *fileEquip = "equipment.db";
     char *errormsg;
     int exit;
 };
 
 int main() {
-    DB inventory;
+    DB db;
 
     // Inventory item
     std::string rustySword = "Rusty Sword";
@@ -177,9 +186,10 @@ int main() {
     int qty = 1;
     std::string gradeTier = "F";
 
-    inventory.addInventory(rustySword, swordStats, qty, gradeTier);
+    db.addInventory(rustySword, swordStats, qty, gradeTier);
     // inventory.deleteItemFromInventory(rustySword);
-    inventory.selectInventory();
+    db.selectFROM("INVENTORY", db.getDB());
+    db.selectFROM("EQUIPMENT", db.getDB());
 
     return 0;
 }
